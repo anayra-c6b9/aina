@@ -10,7 +10,7 @@ aina sits behind a reverse proxy/web server like nginx and servers service-to-se
 
 ## Features
 
-_aina is currently in ==development==_ \
+_aina is currently in <mark>development</mark>_ \
 All new features will be listed below, as soon as developed. \
 ![Features in progress](https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbG13YXZ6cWxtMXZuNzJuMjIzMWJ1OGV5M2o2eHlkODN1NW43MWdkaCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/4IKybi5zUz6nRGj19u/giphy.gif)
 
