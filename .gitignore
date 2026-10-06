@@ -17,7 +17,8 @@ coverage.*
 !coverage.go
 *.coverprofile
 profile.cov
-
+/bin/
+bench/results/
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
