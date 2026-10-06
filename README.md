@@ -17,7 +17,8 @@ All new features will be listed below, as soon as developed. \
 ## Guide
 
 > _In Progress_ \
-> ![Making Guide](https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3Mzh0eDVjZXpncDk4cHg5NzRscG1semNnMjZmNGVsaTFubWptOXNqZCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/XE7XIBzA2yqpY8jgSw/giphy.gif)
+
+![Making Guide](https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3Mzh0eDVjZXpncDk4cHg5NzRscG1semNnMjZmNGVsaTFubWptOXNqZCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/XE7XIBzA2yqpY8jgSw/giphy.gif)
 
 ## Tasks
 
