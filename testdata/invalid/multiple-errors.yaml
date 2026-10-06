@@ -1,0 +1,8 @@
+version: one
+defaults:
+  timout: 3s
+  max_body: lots
+services:
+  orders:
+    url: http://10.0.0.5:3000
+    health: { path: /health, intervall: 5s }

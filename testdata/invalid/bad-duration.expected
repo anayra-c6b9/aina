@@ -1,0 +1,3 @@
+aina.yaml:2:12: timeout must be a duration like 3s, got "3 seconds" (units: ms, s, m, h)
+   2 |   timeout: 3 seconds
+     |            ^

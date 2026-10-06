@@ -1,0 +1,6 @@
+routes:
+  - name: notify-user
+    steps:
+      - id: send
+        call: notifications
+        retries: "two"

@@ -1,0 +1,3 @@
+aina.yaml:4:14: api_key must be one quoted value or a list, got a number (write "${ENV_VAR}" or "${file:/path}")
+aina.yaml:7:15: each api_key entry must be text, got true or false (write "${ENV_VAR}" or "${file:/path}")
+aina.yaml:7:21: each api_key entry must be text, got a mapping (write "${ENV_VAR}" or "${file:/path}")

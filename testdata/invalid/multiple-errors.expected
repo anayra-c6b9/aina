@@ -1,0 +1,12 @@
+aina.yaml:1:10: version must be a whole number, got "one"
+   1 | version: one
+     |          ^
+aina.yaml:3:3: unknown field "timout" in defaults (did you mean "timeout"?)
+   3 |   timout: 3s
+     |   ^
+aina.yaml:4:13: max_body must be a size like 512KB, got "lots" (units: B, KB, MB)
+   4 |   max_body: lots
+     |             ^
+aina.yaml:8:30: unknown field "intervall" in health of service "orders" (did you mean "interval"?)
+   8 |     health: { path: /health, intervall: 5s }
+     |                              ^

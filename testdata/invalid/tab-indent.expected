@@ -1,0 +1,3 @@
+aina.yaml:2:1: tab character in the file (YAML indentation must use spaces, not tabs)
+   2 | 	timeout: 3s
+     | ^

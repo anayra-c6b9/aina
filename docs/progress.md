@@ -1,0 +1,3 @@
+- Done: internal/config loader, errors, positions and expand.go, with tests.
+- Next: probably expr (needed by snapshot/compile), then compile.
+- Promises: run must refuse to start with unresolved secrets (D34).

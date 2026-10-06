@@ -1,0 +1,3 @@
+aina.yaml:4:37: unknown field "coldown" in circuit_breaker of service "auth-service" (did you mean "cooldown"?)
+   4 |     circuit_breaker: { failures: 5, coldown: 30s }
+     |                                     ^

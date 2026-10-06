@@ -1,0 +1,7 @@
+services:
+  orders:
+    url: http://10.0.0.5:3000
+    timeout: 5s
+  inventory:
+    url: http://10.0.0.4:4000
+    timeout: *t

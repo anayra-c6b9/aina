@@ -1,0 +1,3 @@
+aina.yaml:3:41: unquoted {param} inside a one-line { } (quote the path: "/orders/{id}")
+   3 |     match: { method: GET, path: /orders/{id} }
+     |                                         ^

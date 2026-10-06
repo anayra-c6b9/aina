@@ -1,0 +1,3 @@
+aina.yaml:9:11: field "id" is not allowed in undo of step "reserve" (undo has no id: it is identified by its parent step)
+   9 |           id: release
+     |           ^

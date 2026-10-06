@@ -1,0 +1,21 @@
+# every one-or-many field written as a single value
+defaults:
+  retry_on: timeout
+services:
+  orders:
+    url: http://10.0.0.5:3000
+    api_key: "${ORDERS_KEY}"
+groups:
+  - name: api
+    listener: edge
+    use_guards: logged-in
+    routes: []
+routes:
+  - name: notify
+    match: { listener: internal, method: POST, path: /internal/notify }
+    callers: any
+    steps:
+      - id: send
+        call: orders
+        endpoint: POST /send
+        forward: Authorization

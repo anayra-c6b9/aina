@@ -1,0 +1,9 @@
+version: 1
+routes:
+  - name: notify-user
+    match: { listener: internal, method: POST, path: /internal/notify }
+    steps:
+      - id: reserve
+        call: inventory
+        endpoint: POST /reserve
+        retires: 2

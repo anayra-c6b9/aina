@@ -1,3 +1,5 @@
+# This is the Project structure
+
 aina/
 ├── CLAUDE.md                     
 ├── README.md                     

@@ -1,0 +1,2 @@
+defaults:
+  max_body: 1 MB

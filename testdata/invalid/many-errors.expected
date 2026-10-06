@@ -1,0 +1,61 @@
+aina.yaml:2:3: unknown field "unknown_1" in defaults
+   2 |   unknown_1: x
+     |   ^
+aina.yaml:3:3: unknown field "unknown_2" in defaults
+   3 |   unknown_2: x
+     |   ^
+aina.yaml:4:3: unknown field "unknown_3" in defaults
+   4 |   unknown_3: x
+     |   ^
+aina.yaml:5:3: unknown field "unknown_4" in defaults
+   5 |   unknown_4: x
+     |   ^
+aina.yaml:6:3: unknown field "unknown_5" in defaults
+   6 |   unknown_5: x
+     |   ^
+aina.yaml:7:3: unknown field "unknown_6" in defaults
+   7 |   unknown_6: x
+     |   ^
+aina.yaml:8:3: unknown field "unknown_7" in defaults
+   8 |   unknown_7: x
+     |   ^
+aina.yaml:9:3: unknown field "unknown_8" in defaults
+   9 |   unknown_8: x
+     |   ^
+aina.yaml:10:3: unknown field "unknown_9" in defaults
+   10 |   unknown_9: x
+      |   ^
+aina.yaml:11:3: unknown field "unknown_10" in defaults
+   11 |   unknown_10: x
+      |   ^
+aina.yaml:12:3: unknown field "unknown_11" in defaults
+   12 |   unknown_11: x
+      |   ^
+aina.yaml:13:3: unknown field "unknown_12" in defaults
+   13 |   unknown_12: x
+      |   ^
+aina.yaml:14:3: unknown field "unknown_13" in defaults
+   14 |   unknown_13: x
+      |   ^
+aina.yaml:15:3: unknown field "unknown_14" in defaults
+   15 |   unknown_14: x
+      |   ^
+aina.yaml:16:3: unknown field "unknown_15" in defaults
+   16 |   unknown_15: x
+      |   ^
+aina.yaml:17:3: unknown field "unknown_16" in defaults
+   17 |   unknown_16: x
+      |   ^
+aina.yaml:18:3: unknown field "unknown_17" in defaults
+   18 |   unknown_17: x
+      |   ^
+aina.yaml:19:3: unknown field "unknown_18" in defaults
+   19 |   unknown_18: x
+      |   ^
+aina.yaml:20:3: unknown field "unknown_19" in defaults
+   20 |   unknown_19: x
+      |   ^
+aina.yaml:21:3: unknown field "unknown_20" in defaults
+   21 |   unknown_20: x
+      |   ^
+... and 5 more errors

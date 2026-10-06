@@ -1,0 +1,7 @@
+services:
+  orders:
+    url: http://10.0.0.5:3000
+    api_key: 8675309
+  inventory:
+    url: http://10.0.0.4:4000
+    api_key: [true, { k: v }]

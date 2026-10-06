@@ -1,0 +1,3 @@
+aina.yaml:9:11: field "undo" is not allowed in undo of step "reserve" (undo cannot have its own undo)
+   9 |           undo: { call: inventory }
+     |           ^

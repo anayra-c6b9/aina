@@ -1,0 +1,3 @@
+aina.yaml:1:11: a one-line { } is not closed (add the closing })
+   1 | defaults: { timeout: 3s
+     |           ^

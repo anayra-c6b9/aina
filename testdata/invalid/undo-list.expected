@@ -1,0 +1,3 @@
+aina.yaml:8:11: undo takes a single call in v1 (write one call as a mapping, not a list)
+   8 |           - call: inventory
+     |           ^

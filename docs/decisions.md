@@ -145,3 +145,109 @@ trace_id). Config errors print as file:line:col with hint and source line.
 
 Decision: 12 weeks + final 15 days; sponsor checkpoints at weeks 1, 6, 12;
 build demo services and a first benchmark around week 4.
+
+## D21 Loader collects all errors with its own schema walk
+
+Decision: the loader walks the parsed YAML tree against the Go structs
+(reflection over the `yaml` tags) and collects every problem, capped at 20.
+goccy/go-yaml decodes only after the walk is clean; any decoder error is
+converted as a backstop.
+Why: the decoder stops at the first error; the schema asks for all errors.
+The struct tags stay the one source of valid keys and suggestions.
+Rejected: decoding subtrees one by one to gather errors (messy, partial).
+
+## D22 Duplicate keys detected by the loader
+
+Decision: parse with `parser.AllowDuplicateMapKey()` and report duplicates
+ourselves ("first defined at line N").
+Why: the parser's own check is a syntax error that stops parsing, so only
+the first duplicate would be reported.
+
+## D23 Duration and size grammar
+
+Decision: duration = whole number + one unit of ms|s|m|h (no 1m30s, no
+1.5s, no bare numbers). Size = whole number + B|KB|MB, binary (1KB = 1024).
+Why: matches the schema examples; one obvious way to write each value.
+Rejected: time.ParseDuration (accepts ns/us, fractions, compound values).
+
+## D24 Listeners are a fixed struct
+
+Decision: `listeners` has exactly edge, internal, admin (a struct, not a
+free map).
+Why: a typo such as `edg:` gets "did you mean edge".
+
+## D25 undo is one narrow call
+
+Decision: undo is a single mapping (a list is "undo takes a single call in
+v1") with exactly call, endpoint, params, query, forward, map, timeout,
+retries. id, guard, cache, on_fail, optional, expect and nested undo are
+rejected with a reason. Rules about $.steps inside undo belong to compile.
+
+## D26 Position index
+
+Decision: one walk of the parsed tree builds path -> line:col (paths like
+routes[0].steps[2].call), keyed at the key token for mapping entries and
+the item for list entries. Missing paths fall back to the nearest parent.
+Rejected: yaml.PathString lookups (out-of-range errors carry no position;
+keys like auth-service need escaping).
+
+## D27 Testdata at the repository root
+
+Decision: testdata/valid and testdata/invalid (with .expected files) live
+at the repo root, as in docs/structure.md, so compile can reuse them.
+
+## D28 Config file size limit
+
+Decision: files over 1 MiB are rejected before parsing ("config file is
+5.0 MB; the limit is 1 MB"); Load checks the size before reading.
+Why: real configs are a few KB; the cap stops a wrong file from stalling.
+
+## D29 YAML tags rejected
+
+Decision: tags such as !!str are errors, like anchors and aliases.
+Why: same reason as D09: no YAML features beyond plain values.
+
+## D30 Leading byte-order mark stripped
+
+Decision: a UTF-8 BOM at the start of the file is removed before parsing.
+Why: some Windows editors add it, and it otherwise becomes part of the
+first key name.
+
+## D31 Secret type and redaction
+
+Decision: api_key is a SecretList of Secret values. String, GoString,
+MarshalText and MarshalJSON return "[redacted]"; only Reveal returns the
+value; Ref returns the ${...} reference ("" for plaintext). The Config keeps
+the file name and position index but never the file text, because %+v and
+%#v print unexported fields and the text may hold plaintext secrets.
+Config errors whose path is an api_key value are printed without the
+source line.
+
+## D32 Secret expansion
+
+Decision: Expand(cfg, Options) runs after Load, on parsed api_key values
+only. A value must be exactly ${NAME} or ${file:/absolute/clean/path}; text
+around a reference, bad names, relative or unclean paths are errors.
+Values without ${ are plaintext: an error unless AllowPlaintext. File
+values lose one trailing \n or \r\n. An unset or empty variable, or a
+missing, unreadable or empty file, is an error. Resolved values are never
+expanded again. Messages name the variable or path, never the value.
+Expand updates the config only when there are no errors (all-or-nothing),
+so reload can call it again to re-read secrets.
+Options inject LookupEnv and an fs.FS (default os.DirFS("/")), so tests
+need no real environment or disk.
+
+## D33 Warnings shape
+
+Decision: warnings reuse ConfigError with Warning=true, printed as
+`file:line:col: warning: message (hint)`, and are returned separately:
+`Expand(...) (warnings []*ConfigError, err error)`. First use: a secret
+file readable by group or others (mode & 077, not on Windows), hint
+`chmod 600 <path>`.
+
+## D34 Unresolved secrets
+
+Decision: unresolved secrets are silent in Expand; run must refuse to start
+if any secret is unresolved; validate may print a one-line summary.
+(NoEnvCheck leaves a missing variable or unreadable file unresolved:
+Resolved() == false, Reveal() == "". An empty file is still an error.)

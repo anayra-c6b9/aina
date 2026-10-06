@@ -1,0 +1,3 @@
+aina.yaml:9:11: field "expect" is not allowed in undo of step "reserve" (undo has no expect: any 2xx response counts as undone)
+   9 |           expect: { status: 200 }
+     |           ^

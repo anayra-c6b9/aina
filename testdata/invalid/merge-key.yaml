@@ -1,0 +1,4 @@
+services:
+  orders:
+    <<: { timeout: 5s }
+    url: http://10.0.0.5:3000

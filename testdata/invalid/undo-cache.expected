@@ -1,0 +1,3 @@
+aina.yaml:9:11: field "cache" is not allowed in undo of step "reserve" (undo results are never cached)
+   9 |           cache: 5s
+     |           ^

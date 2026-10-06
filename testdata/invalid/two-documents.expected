@@ -1,0 +1,3 @@
+aina.yaml:2:1: the file has more than one YAML document (aina reads one document; remove this ---)
+   2 | ---
+     | ^

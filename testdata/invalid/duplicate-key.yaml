@@ -1,0 +1,4 @@
+defaults:
+  timeout: 3s
+  retries: 0
+  timeout: 5s

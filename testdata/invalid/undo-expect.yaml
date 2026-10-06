@@ -1,0 +1,9 @@
+routes:
+  - name: create-order
+    steps:
+      - id: reserve
+        call: inventory
+        endpoint: POST /reserve
+        undo:
+          call: inventory
+          expect: { status: 200 }

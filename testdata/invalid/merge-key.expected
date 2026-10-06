@@ -1,0 +1,3 @@
+aina.yaml:3:5: merge keys (<<) are not supported (write the keys out in full)
+   3 |     <<: { timeout: 5s }
+     |     ^

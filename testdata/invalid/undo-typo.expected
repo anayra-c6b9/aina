@@ -1,0 +1,3 @@
+aina.yaml:9:11: unknown field "endpont" in undo of step "reserve" (did you mean "endpoint"?)
+   9 |           endpont: POST /release
+     |           ^

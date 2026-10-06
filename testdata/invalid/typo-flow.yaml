@@ -1,0 +1,4 @@
+services:
+  auth-service:
+    url: http://10.0.0.3:3000
+    circuit_breaker: { failures: 5, coldown: 30s }

@@ -1,0 +1,3 @@
+aina.yaml:9:11: field "optional" is not allowed in undo of step "reserve" (undo is always best-effort, so optional does not apply)
+   9 |           optional: true
+     |           ^

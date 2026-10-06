@@ -1,0 +1,3 @@
+aina.yaml:4:3: duplicate key "timeout" (first defined at line 2)
+   4 |   timeout: 5s
+     |   ^

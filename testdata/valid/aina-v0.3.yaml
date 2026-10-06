@@ -1,0 +1,389 @@
+# =====================================================================
+# aina.yaml  --  FROZEN SCHEMA v0.3 (reference + demo scenario)
+#   v0.3 = v0.2 + api_key accepts one value or a list, one-or-many rule,
+#          retry_on validation, strictness rules (see section 12),
+#          and a fix: {id} paths inside { } maps must be quoted.
+#
+# Rules of this file:
+#   * ONE config file. No `include`.
+#   * STRICT parsing: unknown fields are errors, with line numbers.
+#     Also rejected: duplicate keys, multiple documents (---), anchors (&),
+#     aliases (*) and merge keys (<<). See section 12.
+#   * ONE-OR-MANY rule: wherever a field takes names or keys (api_key,
+#     callers, use_guards, forward, retry_on), a single value is shorthand
+#     for a list of one.
+#   * Secrets: "${ENV_VAR}" or "${file:/path}" only. Plain-text secrets fail
+#     validation (override for demos: --allow-plaintext).
+#     Always quote ${...} values (braces are special inside YAML lists).
+#   * Each route lives on exactly ONE listener (edge | internal).
+#     Need both? Write two routes.
+#   * Durations: 100ms, 3s, 2m. Sizes: 512KB, 1MB.
+# =====================================================================
+
+version: 1
+
+# ---------------------------------------------------------------------
+# 1. LISTENERS
+#    edge     = traffic from nginx (end users)
+#    internal = traffic from your registered services (identified by key)
+#    admin    = status / logs / metrics / reload
+#    Changing `listeners` requires a restart (reload refuses and keeps
+#    the old config).
+# ---------------------------------------------------------------------
+listeners:
+  edge:
+    address: 10.0.0.2:8080
+    allow_from: ["10.0.0.1/32"] # nginx only
+  internal:
+    address: 10.0.0.2:8081
+    allow_from: ["10.0.0.0/24"] # service network
+  admin:
+    address: 127.0.0.1:9090
+    allow_from: ["127.0.0.1/32"] # inside Docker: allow your host/scraper
+
+# ---------------------------------------------------------------------
+# 2. DEFAULTS  (inherited by everything; groups, routes, steps override)
+# ---------------------------------------------------------------------
+defaults:
+  timeout: 3s # per step
+  retries: 0
+  retry_backoff: 100ms # doubles each attempt
+  retry_on: [timeout, 502, 503, 504] # never retries 4xx
+  max_body: 1MB # steps routes only; larger -> 413
+  auth: passthrough # passthrough | none
+  caller_header:
+    X-Aina-Key # header services use to identify
+    # themselves to aina
+  strip_headers: # removed from EVERY inbound request
+    - X-User-Id
+    - X-User-Roles
+    - X-Aina-Caller
+  forward_headers: # sent to downstream services
+    - Authorization # (services can override, below)
+    - Cookie
+    - X-Request-Id
+
+# ---------------------------------------------------------------------
+# 3. SERVICES  (the registry)
+# ---------------------------------------------------------------------
+services:
+  auth-service:
+    url: http://10.0.0.3:3000
+    health: { path: /health, interval: 5s, timeout: 1s, unhealthy_after: 3 }
+    circuit_breaker: { failures: 5, cooldown: 30s }
+
+  inventory:
+    url: http://10.0.0.4:4000
+    health: { path: /ping, interval: 5s, timeout: 1s, unhealthy_after: 3 }
+    # api_key takes ONE key or a LIST of keys. A list gives rotation an
+    # overlap window: add the new key, reload, switch the service, then
+    # remove the old key.
+    api_key:
+      - "${INVENTORY_KEY}"
+      - "${file:/run/secrets/inventory_key_old}"
+    send_key_as: X-Api-Key # how aina authenticates TO this service
+    circuit_breaker: { failures: 5, cooldown: 30s }
+
+  orders:
+    url: http://10.0.0.5:3000
+    health: { path: /health }
+    api_key: "${ORDERS_KEY}" # a single key; a list also works
+    timeout: 5s # per-service override
+    circuit_breaker: { failures: 5, cooldown: 30s }
+
+  notifications:
+    url: http://10.0.0.6:5000
+    health: { path: /health }
+    api_key: "${NOTIFY_KEY}"
+    forward_headers: [] # least privilege: no user token, no cookies
+
+# ---------------------------------------------------------------------
+# 4. GUARD SETS  (reusable, read-only pre-flight checks)
+#    A guard set may contain guard steps only.
+# ---------------------------------------------------------------------
+guard_sets:
+  logged-in:
+    - id: auth
+      guard: true
+      call: auth-service
+      endpoint: POST /validate
+      forward: [Authorization]
+      expect: { status: 200 }
+      on_fail:
+        respond: { status: 401, message: "Invalid or expired token" }
+
+# ---------------------------------------------------------------------
+# 5. GROUPS  (routes that share settings)
+#    Inside a group: `listener` is inherited, so `match` holds only
+#    `method` and `path`. The group `prefix` is prepended to every path.
+# ---------------------------------------------------------------------
+groups:
+  - name: public-api
+    prefix: /api/v1
+    listener: edge
+    use_guards: [logged-in]
+    timeout: 8s
+    routes:
+      # ---- A. Multi-step flow with guards, undo, optional step ----------
+      - name: create-order
+        match: { method: POST, path: /orders/create } # -> /api/v1/orders/create
+        request_schema: # early 400, before any call
+          body:
+            itemId: { type: string, required: true }
+            quantity: { type: integer, required: true, min: 1 }
+        max_body: 64KB # route override
+
+        steps:
+          # (guard `auth` comes from guard set `logged-in`, runs first)
+
+          # ---- Phase 1: guards (read-only, safe to fail) ----
+          - id: permission
+            guard: true
+            call: orders
+            endpoint: GET /can-order
+            query: { user: $.steps.auth.response.userId }
+            forward: [Authorization]
+            expect:
+              status: 200
+              rule: "$.response.allowed == true"
+            cache: 5s # pass results only, keyed by outgoing request
+            on_fail:
+              respond: { status: 403, message: "User cannot place orders" }
+
+          # ---- Phase 2: actions (side effects) ----
+          - id: reserve
+            call: inventory
+            endpoint: POST /reserve
+            map:
+              item_id: $.request.body.itemId
+              qty: $.request.body.quantity
+              user_id: $.steps.auth.response.userId
+            retries: 2
+            undo: # runs in reverse if a later action fails
+              call: inventory
+              endpoint: POST /release
+              map: { reservation_id: $.steps.reserve.response.id }
+
+          - id: create
+            call: orders
+            endpoint: POST /orders
+            map:
+              item: $.request.body.itemId
+              qty: $.request.body.quantity
+              reservation_id: $.steps.reserve.response.id
+              user_id: $.steps.auth.response.userId
+            retries: 2
+
+          - id: notify
+            call: notifications
+            endpoint: POST /send
+            optional: true # failure is logged, flow continues
+            map:
+              user_id: $.steps.auth.response.userId
+              template: "order_created"
+              order_id: $.steps.create.response.id
+
+        respond: # omit -> last action step's response
+          status: 201
+          body:
+            order_id: $.steps.create.response.id
+            reservation_id: $.steps.reserve.response.id
+            status: "confirmed"
+
+      # ---- B. Dynamic path via params ------------------------------------
+      - name: get-order
+        match: { method: GET, path: "/orders/{id}" }
+        steps:
+          - id: fetch
+            call: orders
+            endpoint: GET /orders/{id}
+            params: { id: $.request.path_params.id }
+            forward: [Authorization]
+
+# ---------------------------------------------------------------------
+# 6. ROUTES  (standalone, outside any group: `match` has all three fields)
+#    `proxy` and `steps` are mutually exclusive.
+#    `method` is required for steps routes, optional for proxy routes.
+# ---------------------------------------------------------------------
+routes:
+  # ---- C. Streaming proxy for a whole path tree (files, uploads, big bodies)
+  - name: inventory-api
+    match: { listener: edge, path: /inventory/* } # any method
+    proxy: inventory
+    strip_prefix: /inventory # GET /inventory/items/7 -> GET /items/7
+    use_guards: [logged-in]
+
+  # ---- D. Internal service-to-service route -------------------------------
+  - name: notify-user
+    match: { listener: internal, method: POST, path: /internal/notify }
+    callers: [orders, inventory] # identified by api key
+    steps:
+      - id: send
+        call: notifications
+        endpoint: POST /send
+        map:
+          user_id: $.request.body.userId
+          template: $.request.body.template
+
+# =====================================================================
+# 7. VOCABULARY (every allowed keyword; anything else is a validation error)
+#
+#  top level      version, listeners, defaults, services, guard_sets, groups, routes
+#  listeners.*    address, allow_from
+#  defaults       timeout, retries, retry_backoff, retry_on, max_body, auth,
+#                 caller_header, strip_headers, forward_headers
+#  services.*     url, health{path,interval,timeout,unhealthy_after},
+#                 api_key (one key or a list), send_key_as, timeout, forward_headers,
+#                 circuit_breaker{failures,cooldown}
+#  groups[]       name, prefix, listener, use_guards, timeout, retries, max_body, routes
+#  routes[]       name, match{listener,method,path}, callers, request_schema,
+#                 timeout, retries, max_body, use_guards, proxy, strip_prefix,
+#                 steps, respond
+#  steps[]        id, guard, call, endpoint, params, query, forward, map, expect,
+#                 on_fail, retries, timeout, optional, cache, undo
+#  expect         status (default: any 2xx), rule
+#  on_fail        respond
+#  respond        status, body, message
+#  request_schema body.<field>{type,required,min,max}
+# =====================================================================
+
+# =====================================================================
+# 8. EXPRESSIONS
+#
+#  Lookups (compiled once at load time):
+#    $.request.body.<f>     $.request.headers.<n>   $.request.query.<n>
+#    $.request.path_params.<n>
+#    $.steps.<id>.response.<f>     $.steps.<id>.status
+#    $.response.<f>   (only inside expect.rule: the current step's response)
+#
+#  Operators (rule only): == != < > <= >= contains exists and or not
+#  Literals: "string", 123, true, false, null
+#
+#  Semantics:
+#    * A value starting with "$." is a lookup; anything else is a literal.
+#    * A missing path in `map`/`params`/`query` FAILS the step with a clear
+#      message. In a `rule`, a missing path evaluates to false.
+#    * Types are preserved: an integer stays an integer.
+#    * Step ids match [A-Za-z_][A-Za-z0-9_]*; `request`, `steps`, `response`
+#      are reserved.
+# =====================================================================
+
+# =====================================================================
+# 9. VALIDATION RULES (`aina validate`)
+#    Structural (config): unknown fields, wrong types, bad durations/sizes.
+#    Semantic (compile, after groups/guard sets are expanded):
+#      - unknown service / guard set names; duplicate route names or step ids
+#      - reserved or malformed step ids
+#      - guards must come before all action steps
+#      - guard sets contain guard steps only
+#      - proxy + steps on one route; method missing on a steps route
+#      - `listener: both` (rejected: write two routes)
+#      - $.steps.<id> must refer to an EARLIER step that exists
+#        (warning if it refers to an `optional` step)
+#      - duplicate or ambiguous route patterns on the same listener
+#      - `callers` only on internal routes; `callers` names must be services
+#      - `undo` only on action steps; `cache` only on guard steps
+#      - plaintext secrets in api_key
+#    Flags: --no-env-check (CI without secrets), --allow-plaintext (demos),
+#           --check-services (warn about unreachable services)
+# =====================================================================
+
+# =====================================================================
+# 10. ERROR FORMAT (fixed)
+#
+#  {
+#    "error": {
+#      "code": "STEP_FAILED",
+#      "message": "orders returned 503 after 3 attempts",
+#      "route": "create-order",
+#      "failed_step": "create",
+#      "completed_steps": ["auth", "permission", "reserve"],
+#      "undone_steps": ["reserve"],
+#      "undo_failed_steps": [],
+#      "downstream_status": 503,
+#      "trace_id": "9f2c1e..."
+#    }
+#  }
+#
+#  Codes -> HTTP status:
+#    BAD_REQUEST 400 | UNAUTHORIZED_CALLER 401 | GUARD_FAILED (from on_fail)
+#    NO_ROUTE 404 | PAYLOAD_TOO_LARGE 413 | UNSUPPORTED_MEDIA_TYPE 415
+#    STEP_FAILED 502 | SERVICE_DOWN 503 (+Retry-After) | TIMEOUT 504
+#  A downstream 4xx (e.g. 409, 422) is propagated with the same status and
+#  the service's body inside the envelope.
+# =====================================================================
+
+# =====================================================================
+# 11. BEHAVIOR NOTES
+#  Call gate (per outgoing call, fixed order): health DOWN -> breaker OPEN -> send.
+#  Undo runs on its own context and skips the gate.
+#  Retries: only timeout/502/503/504; Idempotency-Key = <trace_id>-<step_id>.
+#  Reload: swaps the snapshot; health + breaker state survive; guard cache
+#          is cleared; listener changes require a restart.
+#  Streaming: proxy routes stream; steps routes buffer JSON (max_body).
+#  Logging: never logs Authorization, Cookie, API keys or bodies.
+#  Delegated to nginx: TLS, edge rate limiting, CORS, compression, edge token checks.
+#
+#  NOT IN v1 (reserved for future versions):
+#    include, OpenAPI import, built-in JWT verification, internal rate limiting,
+#    parallel steps, event triggers, automatic key rotation, persisted rollback
+#    journal, mTLS, webhook alerts.
+# =====================================================================
+
+# =====================================================================
+# 12. STRICTNESS AND VALUE RULES (added in v0.3)
+#
+#  Rejected by the loader (error with file:line:col):
+#    * unknown fields (also inside one-line { ... } maps)
+#    * duplicate keys
+#    * more than one YAML document in the file
+#    * anchors (&name), aliases (*name) and merge keys (<<:)
+#      (may be allowed in a later version; loosening never breaks configs)
+#    * a value of the wrong type (e.g. retries: "two")
+#
+#  One-or-many fields: api_key, callers, use_guards, forward, retry_on.
+#    A single value means a list of one. Internally always a list.
+#    `callers` also accepts the word `any`. Therefore `any` is a RESERVED
+#    service name; `validate` rejects a service called `any`.
+#
+#  retry_on (decoded loosely, checked strictly):
+#    * a word must be one of: timeout
+#    * a number must be a valid HTTP status code (100-599)
+#    * a quoted number such as "502" is an error, with the hint
+#      "write 502 without quotes"
+#    * a 4xx code is accepted with a WARNING (retrying client errors
+#      rarely helps)
+#    * anything else (e.g. banana) is an error
+#    * implementation note: numbers decode as uint64/int64 inside `any`;
+#      convert with one helper.
+#
+#  Path patterns with {param}:
+#    Inside a one-line { ... } map, quote the path: path: "/orders/{id}".
+#    (Same brace trap as secrets. v0.2 had this bug in example B.)
+#
+#  Secrets:
+#    * Always quote ${...}. Unquoted works only as a plain `key: value`;
+#      inside a list or { } it is a syntax error.
+#    * ${ENV} and ${file:...} are expanded AFTER parsing, on the parsed
+#      string values (never by text substitution before parsing), so a
+#      secret containing quotes, colons or newlines cannot alter structure.
+#
+#  Error format for config problems:
+#    aina.yaml:42:7: unknown field "retires" in step "reserve" (did you mean "retries"?)
+#       42 |       retires: 2
+#          |       ^
+#    file:line:col first; config terms (route and step names), not parser
+#    terms; a hint; the source line; all errors at once (capped ~20);
+#    non-zero exit; no colour when not a terminal. Wrong-type messages are
+#    rewritten (e.g. `retries must be a whole number, got "two"`).
+#    Valid-key lists for "did you mean" come from the Go struct tags, the
+#    same source as the vocabulary docs.
+#
+#  Line numbers for semantic errors: build a path -> position index from the
+#  parsed tree (e.g. routes[0].steps[2].call). If a path does not exist,
+#  report the line of the nearest parent that does.
+#
+#  Verified with the library test (goccy/go-yaml, rounds 1 and 2): strict
+#  fields, duplicate keys, positions, list-item paths, document count,
+#  anchor/alias/merge detection.
+# =====================================================================

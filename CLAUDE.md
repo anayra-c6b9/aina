@@ -20,6 +20,7 @@ docs/decisions.md before changing behavior.
 - If an import points against this, stop and ask. Do not work around it.
 - snapshot/ holds data types only.
 - Planned layout: see docs/structure.md
+- Read docs/progress.md first to remember what has been built till now.
 
 ## Behavior rules (from the schema)
 

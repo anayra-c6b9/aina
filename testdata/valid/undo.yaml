@@ -1,0 +1,19 @@
+# undo with every field it accepts
+routes:
+  - name: create-order
+    match: { listener: edge, method: POST, path: /orders }
+    steps:
+      - id: reserve
+        call: inventory
+        endpoint: POST /reserve/{item}
+        params: { item: $.request.body.itemId }
+        retries: 2
+        undo:
+          call: inventory
+          endpoint: POST /release/{id}
+          params: { id: $.steps.reserve.response.id }
+          query: { reason: "order_failed" }
+          forward: Authorization
+          map: { reservation_id: $.steps.reserve.response.id }
+          timeout: 2s
+          retries: 3
