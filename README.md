@@ -22,8 +22,9 @@ All new features will be listed below, as soon as developed. \
 
 ## Tasks
 
-- [ ] Environment Setup
-- [ ] Yaml engine build
+- [x] Environment Setup
+- [x] Yaml config builder
+- [x] Secret expander
 
 ## Note
 
